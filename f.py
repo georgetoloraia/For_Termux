@@ -13,7 +13,13 @@ def send_telegram_message(message):
     bot_token = "6526185567:AAF9oJDCEXD0sdfIHDesNaSw_JOcvfjr0FM"
     chat_id = "7037604847"
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    requests.post(url, data={"chat_id": chat_id, "text": message})
+    # requests.post(url, data={"chat_id": chat_id, "text": message})
+    try:
+        response = requests.post(url, data={"chat_id": chat_id, "text": message})
+        response.raise_for_status()  # Will raise an exception for HTTP errors
+    except requests.exceptions.RequestException as e:
+        print(f"Error sending message: {e}")
+
 
 
 def generate_public_key(priv_key):
@@ -23,29 +29,45 @@ def generate_public_key(priv_key):
     return pub_x
 
 def check_prefix(pub_x, pub_x_seted):
-    """Check if the public x-coordinate starts with the given prefix."""
+    """Check if the public x-coordinate is in the list of valid public keys."""
     pub_x_hex = hex(pub_x)[2:]  # Get the hex representation of pub_x without '0x'
+    
+    # Ensure the hex string is 64 characters long by padding with leading zeros
+    pub_x_hex = pub_x_hex.zfill(64)
+    
+    print(pub_x_hex)
+    
     if pub_x_hex in pub_x_seted:
         return pub_x_hex
+    return None
+
+
+# def generate_random_key(binary_key):
+#     """Generate a new key by randomly swapping 0's and 1's while keeping their count the same."""
+#     ones_count = binary_key.count('1')
+#     zeros_count = len(binary_key) - ones_count
+
+#     # Create a new list of '1's and '0's based on their counts
+#     ones = ['1'] * ones_count
+#     zeros = ['0'] * zeros_count
+
+#     # Combine both lists and shuffle them
+#     combined = ones + zeros
+#     random.shuffle(combined)
+
+#     # Join the shuffled bits into a string
+#     return ''.join(combined)
 
 def generate_random_key(binary_key):
-    """Generate a new key by randomly swapping 0's and 1's while keeping their count the same."""
     ones_count = binary_key.count('1')
     zeros_count = len(binary_key) - ones_count
-
-    # Create a new list of '1's and '0's based on their counts
-    ones = ['1'] * ones_count
-    zeros = ['0'] * zeros_count
-
-    # Combine both lists and shuffle them
-    combined = ones + zeros
+    combined = ['1'] * ones_count + ['0'] * zeros_count
     random.shuffle(combined)
-
-    # Join the shuffled bits into a string
     return ''.join(combined)
 
+
 def process_key_range(start_idx, end_idx, binary_key, pub_x_seted):
-    """Generate keys for a range of indices and check if the public X starts with the given prefix."""
+    """Generate keys for a range of indices and check if the public X in list pubs file."""
     results = []
     iteration_count = 0
     for _ in range(start_idx, end_idx):
@@ -54,7 +76,7 @@ def process_key_range(start_idx, end_idx, binary_key, pub_x_seted):
         priv_key = int(new_binary_key, 2)  # Convert binary to integer
         pub_x = generate_public_key(priv_key)
 
-        # Check if the public key matches the prefix
+        # Check if the public key matches
         if check_prefix(pub_x, pub_x_seted):
             results.append((new_binary_key, hex(pub_x)))
         
@@ -86,6 +108,8 @@ def process_in_parallel(binary_key, pub_x_seted, num_processes=None):
 def main():
     with open("pubs.txt", "r") as f:
         pub_x_seted = {line.strip()[2:66] for line in f}
+        # for tests in pub_x_seted:
+        #     print(tests)
     while True:
         binary_key = ''.join(random.choice(['0', '1']) for _ in range(256))
         # binary_key = "00001"
