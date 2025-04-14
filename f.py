@@ -8,17 +8,21 @@ import requests
 N = ecdsa.SECP256k1.order
 G = ecdsa.SECP256k1.generator
 
+import requests
+
 def send_telegram_message(message):
     """Sends a message to a Telegram bot."""
     bot_token = "6526185567:AAF9oJDCEXD0sdfIHDesNaSw_JOcvfjr0FM"
     chat_id = "7037604847"
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    # requests.post(url, data={"chat_id": chat_id, "text": message})
     try:
         response = requests.post(url, data={"chat_id": chat_id, "text": message})
-        response.raise_for_status()  # Will raise an exception for HTTP errors
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        if response.status_code == 200:
+            print("Telegram message sent successfully")
     except requests.exceptions.RequestException as e:
         print(f"Error sending message: {e}")
+
 
 
 
@@ -34,8 +38,6 @@ def check_prefix(pub_x, pub_x_seted):
     
     # Ensure the hex string is 64 characters long by padding with leading zeros
     pub_x_hex = pub_x_hex.zfill(64)
-    
-    print(pub_x_hex)
     
     if pub_x_hex in pub_x_seted:
         return pub_x_hex
@@ -112,7 +114,6 @@ def main():
         #     print(tests)
     while True:
         binary_key = ''.join(random.choice(['0', '1']) for _ in range(256))
-        # binary_key = "00001"
 
         # Start processing combinations in parallel
         process_in_parallel(binary_key, pub_x_seted)
