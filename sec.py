@@ -79,6 +79,8 @@ def main():
 
     while True:
         priv_key = randint(N//2, N)
+        # priv_key = randint(1, N//2)
+        # print(priv_key)
         pub_point = ec_ops.generator  # The generator point of the SECP256k1 curve
         result_point, need_test = ec_ops.scalar_mult(priv_key, pub_point)
 
@@ -87,8 +89,9 @@ def main():
                 pub_x_hex = hex(i)[2:].zfill(64)
                 if pub_x_hex in pub_x_seted:  # Check if the hex value matches
                     message = f"point = {i} Priv = {priv_key}"
+                    print(message)
                     send_telegram_message(message)
-                    time.sleep(3)
+                    time.sleep(1)
 
 if __name__ == "__main__":
     main()
