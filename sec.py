@@ -39,8 +39,8 @@ class ECOperations:
                 # print(f"1 = {R.x()}")
                 need_test.append(R.x())  # Append the x coordinate to need_test
             Q = self.ec_add(Q, Q)  # Double the point Q
-            # print(f"Double = {Q}")
-            need_test.append(Q.x)
+            # print(f"Double = {Q.x()}")
+            need_test.append(Q.x())
             k >>= 1  # Right shift k by 1
         return R, need_test
 
