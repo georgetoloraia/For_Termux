@@ -85,7 +85,8 @@ def process_range(start, end, ec_ops, pub_x_seted):
                     print(message)
                     send_telegram_message(message)
                     time.sleep(1)
-        start += 1
+                    exit()
+        # start += 1
 
 def main():
     ec_ops = ECOperations()
@@ -96,8 +97,13 @@ def main():
     num_cores = multiprocessing.cpu_count()
 
     # Define the range of private keys
+    # start_range = 1
+    # end_range = N // 2
+
+    #for termux check test, I need delete this after check
     start_range = 1
-    end_range = N // 2
+    end_range = 100000
+
 
     # Divide the work into equal parts for each CPU core
     range_per_core = (end_range - start_range) // num_cores
