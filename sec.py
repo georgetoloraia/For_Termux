@@ -36,12 +36,13 @@ class ECOperations:
             # print(bin(k))
             if k & 1:  # If the least significant bit of k is 1, add Q to R
                 R = self.ec_add(R, Q) if R else Q  # If R is None, we initialize it to Q
-                # print(f"1 = {R.x()}")
+                # print(f"add = {R.x()}")
                 need_test.append(R.x())  # Append the x coordinate to need_test
             Q = self.ec_add(Q, Q)  # Double the point Q
             # print(f"Double = {Q.x()}")
             need_test.append(Q.x())
             k >>= 1  # Right shift k by 1
+        # exit()
         return R, need_test
 
 
@@ -78,8 +79,8 @@ def main():
         pub_x_seted = {line.strip()[2:66] for line in f}
 
     while True:
-        priv_key = randint(N//2, N)
-        # priv_key = randint(1, N//2)
+        # priv_key = randint(N//2, N)
+        priv_key = randint(1, N//2)
         # print(priv_key)
         pub_point = ec_ops.generator  # The generator point of the SECP256k1 curve
         result_point, need_test = ec_ops.scalar_mult(priv_key, pub_point)
@@ -87,6 +88,7 @@ def main():
         for i in need_test:
             if isinstance(i, int):  # Ensure i is an integer
                 pub_x_hex = hex(i)[2:].zfill(64)
+                print(pub_x_hex)
                 if pub_x_hex in pub_x_seted:  # Check if the hex value matches
                     message = f"point = {i} Priv = {priv_key}"
                     print(message)
