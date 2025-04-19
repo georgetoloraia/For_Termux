@@ -41,7 +41,7 @@ class ECOperations:
             Q = self.ec_add(Q, Q)  # Double the point Q
             need_test.append(Q.x())
             k >>= 1  # Right shift k by 1
-        return R, need_test
+        return R, need_test[-100:]
 
 def mod_inverse(a, p):
     """Computes the modular inverse of a modulo p using Extended Euclidean Algorithm."""
@@ -85,7 +85,6 @@ def process_range(start, end, ec_ops, pub_x_seted):
                     print(message)
                     send_telegram_message(message)
                     time.sleep(1)
-        # start += 1
 
 def main():
     ec_ops = ECOperations()
