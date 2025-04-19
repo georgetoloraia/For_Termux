@@ -63,7 +63,10 @@ while priv_key > 0:
         double = generate_public_key(test)
         # print(f"Original Doubled X: {hex(double)}")
         if double in int_pubs:
-            print(f"✅ pub_x_original == (2 * test) & N = {double} from {priv_key}")
+            message = f"✅ pub_x_original == (2 * test) & N = {double} from {priv_key}"
+            print(message)
+            with open("FOUND.txt", "a") as j:
+                 j.wriet(message)
         test >>= 1
     priv_key += randint(1, 2**256)
     # print(priv_key)
