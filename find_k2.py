@@ -53,7 +53,8 @@ class ECOperations:
             for v_candidate in v_candidates:
                 R = Point(self.curve, u_candidate, v_candidate)
                 R_double = self.ec_add(R, R)
-                if R_double.x() == x and R_double.y() == y:
+                if R_double.x() == x:
+                    print(f"Y E S ---- R_double.x() == x = {x}")
                     return R
             return None
 
