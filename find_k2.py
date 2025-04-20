@@ -144,7 +144,10 @@ def main():
     # Recover the private key from Q
     ec_ops = ECOperations()
     recovered_k, steps = ec_ops.track_steps(x, y, P)
-    print(f"Recovered private key: {recovered_k}, steps: {steps}")
+    message = f"Recovered private key: {recovered_k}, steps: {steps}"
+    print(message)
+    with open("Found.txt", "a") as found:
+        found.write(message)
 
 if __name__ == "__main__":
     main()
