@@ -132,7 +132,7 @@ class Secp256k1:
                         return d
                 visited[(x1, y1)].append((x1, y1, a1, b1))
 
-        print("Private key not found.")
+        # print("Private key not found.")
         return None
 
 def search_for_keys(public_keys):
