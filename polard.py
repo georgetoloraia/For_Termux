@@ -106,8 +106,8 @@ class Secp256k1:
         visited = defaultdict(list)
 
         # Arbitrary number of iterations to limit search space
-        for _ in range(256):
-            i = random.randint(N//2, N)
+        for _ in range(2**32):
+            i = random.randint(1, N)
             # Generate a random path using pseudo-random function
             if i % 3 == 0:
                 point1 = Secp256k1.point_add(ECPoint(x1, y1), Secp256k1.G)
