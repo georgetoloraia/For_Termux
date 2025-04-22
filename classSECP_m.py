@@ -1,8 +1,10 @@
+from ecdsa import SECP256k1, SigningKey
 import os
 import sys
 import requests
 from random import randint
 import multiprocessing
+from multiprocessing import cpu_count
 
 # Example of embedding the contents of int_pubs.txt as a string.
 int_pubs_data = """
@@ -133437,6 +133439,10 @@ class Secp256k1:
     def generate_public_key(private_key):
         return Secp256k1.scalar_mult(private_key, Secp256k1.G)
 
+def generate_public_key_origin(private_key):
+    sk = SigningKey.from_secret_exponent(private_key, curve=SECP256k1)
+    vk = sk.get_verifying_key()
+    return vk.pubkey.point.x()
 
 def send_telegram_message(message):
     """Sends a message to a Telegram bot."""
@@ -133453,50 +133459,56 @@ def send_telegram_message(message):
 
 
 def check_modification_1(both, private_key, user_address, int_pubs_set, N):
+    print("check_modification_1 started.")
     for pab_1 in int_pubs_set:
-        modified_key = private_key + (pab_1 % both)
-        public_key, _ = Secp256k1.generate_public_key(modified_key)
-        if public_key.x in int_pubs_set:
+        modified_key = (private_key + (pab_1 % both)) % N
+        public_key = generate_public_key_origin(modified_key)
+        if public_key in int_pubs_set:
             message = f"{modified_key} for {public_key.x} from user = {user_address}"
             print(message)
             send_telegram_message(message)
             return True
+    print("check_modification_1 completed.!")
     return False
 
 def check_modification_2(both, private_key, user_address, int_pubs_set, N):
+    print("check_modification_1 started.")
     for pab_2 in int_pubs_set:
         modified_key = (private_key * (pab_2 % both)) % N
-        public_key, _ = Secp256k1.generate_public_key(modified_key)
-        if public_key.x in int_pubs_set:
+        public_key = generate_public_key_origin(modified_key)
+        if public_key in int_pubs_set:
             message = f"{modified_key} for {public_key.x} from user = {user_address}"
             print(message)
             send_telegram_message(message)
             return True
+    print("check_modification_2 completed.!")
     return False
 
 def check_public_key(private_key, int_pubs_set, N, user_address):
+    print(private_key)
     public_key, both = Secp256k1.generate_public_key(private_key)
     # pab = [set(int(pabs)) for b in int ]
 
     # Use multiprocessing to check both modifications in parallel
-    with multiprocessing.Pool(processes=2) as pool:
+    with multiprocessing.Pool(processes=cpu_count()) as pool:
+        print("multyproc start")
         # Submit the two modifications as separate tasks
         result_1 = pool.apply_async(check_modification_1, (both, private_key, user_address, int_pubs_set, N))
         result_2 = pool.apply_async(check_modification_2, (both, private_key, user_address, int_pubs_set, N))
 
         # Wait for the results
-        if result_1.get() or result_2.get():
+        if result_1.get() and result_2.get():
             return  # Exit if a match is found
 
 def main():
     N = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141  # SECP256k1 order
-    private_key = randint(1, N)
+    private_key = randint(1, N-1)
     user_address = input("Please, Input Your Bitcoin Address..! \nIt need receive money for your machine work\nInput Address: ")
     print("Work started....Good Luck both, To you and me ;)")
 
     while True:
         check_public_key(private_key, int_pubs_set, N, user_address)
-        private_key = randint(1, N)
+        private_key = randint(1, N-1)
 
 if __name__ == "__main__":
     main()
