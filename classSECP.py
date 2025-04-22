@@ -58,8 +58,9 @@ class Secp256k1:
             addend = Secp256k1.point_add(addend, addend)
             # print(addend.x)
             k >>= 1
+        both = Secp256k1.point_add(result, result)
 
-        return result, addend.x
+        return result, both.x
 
     @staticmethod
     def generate_public_key(private_key):
