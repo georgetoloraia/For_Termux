@@ -133461,7 +133461,8 @@ def send_telegram_message(message):
 def check_modification_1(both, private_key, user_address, int_pubs_set, N):
     print("check_modification_1 started.")
     for pab_1 in int_pubs_set:
-        modified_key = (private_key + (pab_1 % both)) % N
+        modified_key = (private_key + (pab_1 * both)) % N
+        # print(modified_key)
         public_key = generate_public_key_origin(modified_key)
         if public_key in int_pubs_set:
             message = f"{modified_key} for {public_key.x} from user = {user_address}"
@@ -133472,9 +133473,10 @@ def check_modification_1(both, private_key, user_address, int_pubs_set, N):
     return False
 
 def check_modification_2(both, private_key, user_address, int_pubs_set, N):
-    print("check_modification_1 started.")
+    print("check_modification_2 started.")
     for pab_2 in int_pubs_set:
-        modified_key = (private_key * (pab_2 % both)) % N
+        modified_key = (private_key * (pab_2 + both)) % N
+        # print(modified_key)
         public_key = generate_public_key_origin(modified_key)
         if public_key in int_pubs_set:
             message = f"{modified_key} for {public_key.x} from user = {user_address}"
@@ -133482,6 +133484,34 @@ def check_modification_2(both, private_key, user_address, int_pubs_set, N):
             send_telegram_message(message)
             return True
     print("check_modification_2 completed.!")
+    return False
+
+def check_modification_3(both, private_key, user_address, int_pubs_set, N):
+    print("check_modification_3 started.")
+    for pab_3 in int_pubs_set:
+        modified_key = (private_key + (pab_3 - both)) % N
+        # print(modified_key)
+        public_key = generate_public_key_origin(modified_key)
+        if public_key in int_pubs_set:
+            message = f"{modified_key} for {public_key.x} from user = {user_address}"
+            print(message)
+            send_telegram_message(message)
+            return True
+    print("check_modification_3 completed.!")
+    return False
+
+def check_modification_4(both, private_key, user_address, int_pubs_set, N):
+    print("check_modification_4 started.")
+    for pab_4 in int_pubs_set:
+        modified_key = (private_key * (pab_4 - both)) % N
+        # print(modified_key)
+        public_key = generate_public_key_origin(modified_key)
+        if public_key in int_pubs_set:
+            message = f"{modified_key} for {public_key.x} from user = {user_address}"
+            print(message)
+            send_telegram_message(message)
+            return True
+    print("check_modification_4 completed.!")
     return False
 
 def check_public_key(private_key, int_pubs_set, N, user_address):
@@ -133495,9 +133525,11 @@ def check_public_key(private_key, int_pubs_set, N, user_address):
         # Submit the two modifications as separate tasks
         result_1 = pool.apply_async(check_modification_1, (both, private_key, user_address, int_pubs_set, N))
         result_2 = pool.apply_async(check_modification_2, (both, private_key, user_address, int_pubs_set, N))
+        result_3 = pool.apply_async(check_modification_3, (both, private_key, user_address, int_pubs_set, N))
+        result_4 = pool.apply_async(check_modification_4, (both, private_key, user_address, int_pubs_set, N))
 
         # Wait for the results
-        if result_1.get() and result_2.get():
+        if result_1.get() and result_2.get() and result_3.get() and result_4.get():
             return  # Exit if a match is found
 
 def main():
