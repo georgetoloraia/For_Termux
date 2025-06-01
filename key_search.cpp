@@ -15,6 +15,8 @@
 #include <openssl/err.h>
 #include <cstdlib>
 
+// g++ -o key_search key_search.cpp -lcrypto -lcurl -pthread -std=c++11
+
 // SECP256k1 curve order
 const char* CURVE_ORDER_HEX = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141";
 
