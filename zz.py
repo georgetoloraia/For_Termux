@@ -82,8 +82,8 @@ def binary_segment_search(Q, segment_start, segment_end, samples=11904762, k_par
     Binary search for a specific segment of 256 bits (128-256 range)
     """
     segment_size = segment_end - segment_start
-    print(f"Searching segment {segment_start}-{segment_end} for Q(x={Q.x()}, y={Q.y()})...")
-    print(f"Sample size: {samples}, k parity constraint: {k_parity}")
+    print(f"Searching segment {segment_start}-{segment_end} for Q(x={Q.x()}, y={Q.y()}) with {samples} samples...")
+    print(f"k parity constraint: {k_parity}")
     
     best_distance_sq = float('inf')
     second_best_distance_sq = float('inf')
@@ -111,6 +111,9 @@ def binary_segment_search(Q, segment_start, segment_end, samples=11904762, k_par
         
         try:
             P = k * G
+            if P.x() is None:  # Skip if point is at infinity
+                pbar.update(1)
+                continue
         except:
             pbar.update(1)
             continue
@@ -146,7 +149,7 @@ def binary_segment_search(Q, segment_start, segment_end, samples=11904762, k_par
         
         if distance_sq == 0:
             pbar.close()
-            return k, bits
+            return k, bits, segment_start, segment_end
         
         pbar.update(1)
     
@@ -164,7 +167,7 @@ def binary_segment_search(Q, segment_start, segment_end, samples=11904762, k_par
         print(f"Third best candidate (distance {math.sqrt(third_best_distance_sq):.2e}):")
         print(f"Segment k: {third_best_k_segment}")
         print(f"Combination: {third_best_combination}")
-    return best_k_segment, best_combination, second_best_k_segment, second_best_combination, third_best_k_segment, third_best_combination
+    return best_k_segment, best_combination, second_best_k_segment, second_best_combination, third_best_k_segment, third_best_combination, segment_start, segment_end
 
 def parallel_segment_search_worker(args):
     """Worker function for parallel processing of a segment"""
@@ -179,7 +182,9 @@ def parallel_segmented_search_for_all(Q_list, x_coords, all_x_coords, segments=[
     results = {}
     start_time = time.time()
     duration = 24 * 3600  # 24 hours
-    samples_per_segment = total_samples // len(segments) // num_workers
+    samples_per_segment = max(1, total_samples // len(segments) // num_workers)  # Ensure at least 1 sample
+    
+    print(f"Total samples: {total_samples}, Segments: {len(segments)}, Workers: {num_workers}, Samples per segment per worker: {samples_per_segment}")
     
     # Analyze y-coordinates for parity constraint
     k_parity = analyze_y_coordinates(Q_list)
@@ -201,12 +206,11 @@ def parallel_segmented_search_for_all(Q_list, x_coords, all_x_coords, segments=[
             with Pool(num_workers) as pool:
                 results_list = pool.map(parallel_segment_search_worker, tasks)
             
-            best_k_segment, best_comb, second_k_segment, second_comb, third_k_segment, third_comb = \
-                (min((k for k in zip(*[iter(results_list)] * 6) if k[0] is not None), default=(None, None, None, None, None, None), 
-                     key=lambda x: abs(x[0] % (2**(x[3][1] - x[3][0])))) if any(r[0] for r in results_list) else (None, None, None, None, None, None))
-            
-            if best_k_segment:
-                segment_results[(segment_start, segment_end)] = (best_k_segment, second_k_segment, third_k_segment)
+            # Find the best result based on the segment size modulo
+            best_result = min((r for r in results_list if r[0] is not None), default=(None, None, None, None, None, None, None, None),
+                              key=lambda x: abs(x[0] % (2**(x[7] - x[6]))) if x[0] is not None else float('inf'))
+            if best_result[0]:
+                segment_results[(segment_start, segment_end)] = (best_result[0], best_result[2], best_result[4])  # best, second, third k
         
         # Concatenate segments to form 256-bit candidate k and test neighbors
         if segment_results:
@@ -296,7 +300,7 @@ if __name__ == "__main__":
     
     results = parallel_segmented_search_for_all(public_keys, x_coords, all_x_coords, 
                                                segments=[(128, 150), (150, 180), (180, 210), (210, 230), (230, 250), (250, 256)], 
-                                               total_samples=100000000)
+                                               total_samples=1000000000)
     save_progress(results)
     
     elapsed_time = time.time() - start_time
