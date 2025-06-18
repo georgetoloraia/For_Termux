@@ -67,53 +67,55 @@ def analyze_y_coordinates(public_keys):
     parity_count = Counter(parity)
     print(f"\nY-coordinate analysis:")
     print(f"Parity distribution: {parity_count}")
-    # Constrain k parity based on y parity
-    if parity_count.get(0, 0) == len(public_keys):  # All even
+    if parity_count.get(0, 0) == len(public_keys):
         print("All y-coordinates are even; constraining k to even values.")
-        return 0  # Even k
-    elif parity_count.get(1, 0) == len(public_keys):  # All odd
+        return 0
+    elif parity_count.get(1, 0) == len(public_keys):
         print("All y-coordinates are odd; constraining k to odd values.")
-        return 1  # Odd k
+        return 1
     print("Mixed parity; no k constraint from y.")
     return None
 
-def binary_segment_search(Q, segment_start, segment_end, samples=11904762, k_parity=None):
-    """
-    Binary search for a specific segment of 256 bits (128-256 range)
-    """
+def binary_segment_search(Q, segment_start, segment_end, samples=2500000000, k_parity=None):
     segment_size = segment_end - segment_start
     print(f"Searching segment {segment_start}-{segment_end} for Q(x={Q.x()}, y={Q.y()}) with {samples} samples...")
     print(f"k parity constraint: {k_parity}")
     
     best_distance_sq = float('inf')
-    second_best_distance_sq = float('inf')
-    third_best_distance_sq = float('inf')
     best_k_segment = None
-    second_best_k_segment = None
-    third_best_k_segment = None
     best_combination = None
-    second_best_combination = None
-    third_best_combination = None
     
     pbar = tqdm(total=samples, desc=f"Segment {segment_start}-{segment_end}", ncols=80)
-    for _ in range(samples):
-        # Generate random binary vector for the segment
-        bits = [random.randint(0, 1) for _ in range(segment_size)]
-        # Pad with zeros for bits < 128 and other bits to form 256-bit k
-        full_bits = [0] * 128 + [0] * segment_start + bits + [0] * (256 - segment_end)
-        k = sum(2**i for i, bit in enumerate(full_bits) if bit) % order
+    for i in range(samples):
+        # Generate k as a geometric progression starting from 2^134
+        base_k = (2 ** 134) * (1 + i * 0.01)
+        k = int(base_k + random.randint(0, 2**(segment_end - segment_start) - 1)) % order
         
-        # Apply parity constraint if specified
         if k_parity is not None:
             while k % 2 != k_parity:
-                full_bits[128] = 1 - full_bits[128]  # Flip a bit >= 128 to adjust parity
-                k = sum(2**i for i, bit in enumerate(full_bits) if bit) % order
+                k = (k + 1) % order
         
         try:
+            # Checkpoint 1: Multiplication k * G
             P = k * G
-            if P.x() is None:  # Skip if point is at infinity
+            if P.x() is None:
                 pbar.update(1)
                 continue
+            
+            # Checkpoint 2: Addition (e.g., P + G for testing)
+            P_added = P + G
+            if P_added.x() is None:
+                pbar.update(1)
+                continue
+            
+            # Check matches at checkpoints
+            if P.x() in all_x_coords:
+                print(f"Match found at multiplication checkpoint: k={k}, x={P.x()}")
+                return k, bin(k)[2:].zfill(256)[-segment_size:], segment_start, segment_end
+            if P_added.x() in all_x_coords:
+                print(f"Match found at addition checkpoint: k={k}, x={P_added.x()}")
+                return k, bin(k)[2:].zfill(256)[-segment_size:], segment_start, segment_end
+            
         except:
             pbar.update(1)
             continue
@@ -123,33 +125,12 @@ def binary_segment_search(Q, segment_start, segment_end, samples=11904762, k_par
         distance_sq = dx*dx + dy*dy
         
         if distance_sq < best_distance_sq:
-            third_best_distance_sq = second_best_distance_sq
-            third_best_k_segment = second_best_k_segment
-            third_best_combination = second_best_combination
-            second_best_distance_sq = best_distance_sq
-            second_best_k_segment = best_k_segment
-            second_best_combination = best_combination
             best_distance_sq = distance_sq
             best_k_segment = k
-            best_combination = bits[:]
-        elif distance_sq < second_best_distance_sq and distance_sq != 0:
-            third_best_distance_sq = second_best_distance_sq
-            third_best_k_segment = second_best_k_segment
-            third_best_combination = second_best_combination
-            second_best_distance_sq = distance_sq
-            second_best_k_segment = k
-            second_best_combination = bits[:]
-        elif distance_sq < third_best_distance_sq and distance_sq != 0:
-            third_best_distance_sq = distance_sq
-            third_best_k_segment = k
-            third_best_combination = bits[:]
+            best_combination = [bit for bit in bin(k)[2:].zfill(256)[-segment_size:]]
         
         best_distance = math.sqrt(best_distance_sq)
         pbar.set_description(f"Best dist: {best_distance:.1e}")
-        
-        if distance_sq == 0:
-            pbar.close()
-            return k, bits, segment_start, segment_end
         
         pbar.update(1)
     
@@ -158,82 +139,55 @@ def binary_segment_search(Q, segment_start, segment_end, samples=11904762, k_par
     if best_combination:
         print(f"Best candidate (distance {math.sqrt(best_distance_sq):.2e}):")
         print(f"Segment k: {best_k_segment}")
-        print(f"Combination: {best_combination}")
-    if second_best_combination:
-        print(f"Second best candidate (distance {math.sqrt(second_best_distance_sq):.2e}):")
-        print(f"Segment k: {second_best_k_segment}")
-        print(f"Combination: {second_best_combination}")
-    if third_best_combination:
-        print(f"Third best candidate (distance {math.sqrt(third_best_distance_sq):.2e}):")
-        print(f"Segment k: {third_best_k_segment}")
-        print(f"Combination: {third_best_combination}")
-    return best_k_segment, best_combination, second_best_k_segment, second_best_combination, third_best_k_segment, third_best_combination, segment_start, segment_end
+    return best_k_segment, best_combination, None, None, None, None, segment_start, segment_end
 
 def parallel_segment_search_worker(args):
-    """Worker function for parallel processing of a segment"""
+    global all_x_coords  # Ensure access to all_x_coords
     Q, task_id, num_tasks, segment_start, segment_end, samples, k_parity = args
     random.seed(int(time.time()) + task_id)
-    
-    print(f"Worker {task_id} starting segment {segment_start}-{segment_end} with {samples} samples...")
     return binary_segment_search(Q, segment_start, segment_end, samples, k_parity)
 
-def parallel_segmented_search_for_all(Q_list, x_coords, all_x_coords, segments=[(128, 150), (150, 180), (180, 210), (210, 230), (230, 250), (250, 256)], 
-                                     total_samples=1000000000, num_workers=8):
+def parallel_segmented_search_for_all(Q_list, x_coords, all_x_coords, segments=[(134, 160), (160, 192), (192, 224), (224, 256)], 
+                                     total_samples=10000000000, num_workers=8):
     results = {}
     start_time = time.time()
     duration = 24 * 3600  # 24 hours
-    samples_per_segment = max(1, total_samples // len(segments) // num_workers)  # Ensure at least 1 sample
+    samples_per_segment = max(1, total_samples // len(segments) // num_workers)
     
     print(f"Total samples: {total_samples}, Segments: {len(segments)}, Workers: {num_workers}, Samples per segment per worker: {samples_per_segment}")
-    
-    # Analyze y-coordinates for parity constraint
     k_parity = analyze_y_coordinates(Q_list)
     
     for idx, Q in enumerate(Q_list):
         if time.time() - start_time > duration:
             break
-            
         if Q.x() not in x_coords:
             continue
-            
         print(f"\nProcessing public key {idx + 1}/{len(Q_list)}: (x={Q.x()}, y={Q.y()})")
         segment_results = {}
         
         for segment_start, segment_end in segments:
             tasks = [(Q, i, num_workers, segment_start, segment_end, samples_per_segment, k_parity) 
                      for i in range(num_workers)]
-            
             with Pool(num_workers) as pool:
                 results_list = pool.map(parallel_segment_search_worker, tasks)
             
-            # Find the best result based on the segment size modulo
             best_result = min((r for r in results_list if r[0] is not None), default=(None, None, None, None, None, None, None, None),
                               key=lambda x: abs(x[0] % (2**(x[7] - x[6]))) if x[0] is not None else float('inf'))
             if best_result[0]:
-                segment_results[(segment_start, segment_end)] = (best_result[0], best_result[2], best_result[4])  # best, second, third k
+                segment_results[(segment_start, segment_end)] = (best_result[0], best_result[1])
         
-        # Concatenate segments to form 256-bit candidate k and test neighbors
         if segment_results:
             candidate_k = 0
-            total_bits = 0
-            top_candidates = []
-            for (start, end), (best_k, second_k, third_k) in sorted(segment_results.items()):
+            for (start, end), (best_k, best_comb) in sorted(segment_results.items()):
                 shift = 256 - end
                 if shift < 0:
                     shift = 0
                 mask = (1 << (end - start)) - 1
                 segment_value = best_k % (1 << (end - start))
                 candidate_k |= (segment_value << shift)
-                total_bits += end - start
-                # Add top 3 candidates for this segment
-                if second_k:
-                    top_candidates.append((start, end, second_k))
-                if third_k:
-                    top_candidates.append((start, end, third_k))
             
-            candidate_k &= (1 << 256) - 1  # Mask to 256 bits
+            candidate_k &= (1 << 256) - 1
             
-            # Test primary candidate and neighbors
             for k in [candidate_k, candidate_k - 2, candidate_k - 1, candidate_k + 1, candidate_k + 2]:
                 k = k % order if k >= 0 else order + k
                 try:
@@ -246,32 +200,7 @@ def parallel_segmented_search_for_all(Q_list, x_coords, all_x_coords, segments=[
                 except Exception as e:
                     print(f"Verification failed for k={k}, Q(x={Q.x()}, y={Q.y()}): {e}")
             else:
-                print(f"No x match for primary candidate_k={candidate_k}, computed x={computed_x}")
-            
-            # Test alternative candidates from top 3
-            for start, end, alt_k in top_candidates:
-                alt_candidate_k = 0
-                for (s, e), (b_k, s_k, t_k) in sorted(segment_results.items()):
-                    shift = 256 - e
-                    if shift < 0:
-                        shift = 0
-                    mask = (1 << (e - s)) - 1
-                    segment_value = (alt_k if s == start and e == end else b_k) % (1 << (e - s))
-                    alt_candidate_k |= (segment_value << shift)
-                alt_candidate_k &= (1 << 256) - 1
-                for k in [alt_candidate_k, alt_candidate_k - 2, alt_candidate_k - 1, alt_candidate_k + 1, alt_candidate_k + 2]:
-                    k = k % order if k >= 0 else order + k
-                    try:
-                        computed_P = k * G
-                        computed_x = computed_P.x()
-                        if computed_x in all_x_coords:
-                            results[Q] = k
-                            print(f"Private key found: {k} from alternative, x match: {computed_x}")
-                            break
-                    except Exception as e:
-                        print(f"Verification failed for alt_k={k}, Q(x={Q.x()}, y={Q.y()}): {e}")
-                else:
-                    print(f"No x match for alt_candidate_k={alt_candidate_k}, computed x={computed_x}")
+                print(f"No x match for candidate_k={candidate_k}, computed x={computed_x}")
         else:
             print(f"No private key found for (x={Q.x()}, y={Q.y()}) with segmented search")
     
@@ -281,10 +210,9 @@ def save_progress(results, filename="progress.json"):
     with open(filename, 'w') as f:
         json.dump({f"{k.x()},{k.y()}": v for k, v in results.items()}, f)
 
-# Main execution
 if __name__ == "__main__":
     print("=" * 80)
-    print("Modified Segmented 256-Bit Range Binary Search with 128-256 Focus and Neighbor Check")
+    print("Checkpoint-Enabled Segmented Search with 134-256 Focus")
     print("=" * 80)
     
     public_keys, all_x_coords = read_public_keys()
@@ -299,8 +227,8 @@ if __name__ == "__main__":
     start_time = time.time()
     
     results = parallel_segmented_search_for_all(public_keys, x_coords, all_x_coords, 
-                                               segments=[(128, 150), (150, 180), (180, 210), (210, 230), (230, 250), (250, 256)], 
-                                               total_samples=100)
+                                               segments=[(134, 160), (160, 192), (192, 224), (224, 256)], 
+                                               total_samples=1000000000)
     save_progress(results)
     
     elapsed_time = time.time() - start_time
@@ -319,4 +247,4 @@ if __name__ == "__main__":
     print(f"Total time: {elapsed_time:.2f} seconds")
     print(f"Curve order: {order}")
     print(f"Number of public keys processed: {len(public_keys)}")
-    print(f"Total samples: {1000000000}")
+    print(f"Total samples: {10000000000}")
