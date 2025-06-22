@@ -166,7 +166,7 @@ void search_range(const Point& target, const cpp_int& start, const cpp_int& end,
     Point current = target;
     Point minus_G = point_neg(G);
     cpp_int i = start;
-    auto last_report = std::chrono::steady_clock::now();
+    // auto last_report = std::chrono::steady_clock::now();
     
     // Fast-forward to start position
     current = point_add(current, scalar_mult(minus_G, start));
@@ -188,13 +188,13 @@ void search_range(const Point& target, const cpp_int& start, const cpp_int& end,
         i++;
         
         // Report progress every second
-        auto now = std::chrono::steady_clock::now();
-        if (std::chrono::duration_cast<std::chrono::seconds>(now - last_report).count() >= 1) {
-            std::lock_guard<std::mutex> lock(mtx);
-            std::cout << "Thread " << std::this_thread::get_id() 
-                      << " at iteration " << i << " (" << (i - start) << " iterations done)\n";
-            last_report = now;
-        }
+        // auto now = std::chrono::steady_clock::now();
+        // if (std::chrono::duration_cast<std::chrono::seconds>(now - last_report).count() >= 1) {
+        //     std::lock_guard<std::mutex> lock(mtx);
+        //     std::cout << "Thread " << std::this_thread::get_id() 
+        //               << " at iteration " << i << " (" << (i - start) << " iterations done)\n";
+        //     last_report = now;
+        // }
     }
 }
 
