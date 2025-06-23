@@ -380,8 +380,8 @@ int main() {
 
         // Step 4: Parallel search
         unsigned num_threads = std::thread::hardware_concurrency();
-        cpp_int max_iter = 100000000;
-        int max_random_attempts = 1000000;
+        cpp_int max_iter = 500000000;
+        int max_random_attempts = 2000000;
         std::cout << "Using " << num_threads << " threads\n";
 
         auto start_time = std::chrono::high_resolution_clock::now();
