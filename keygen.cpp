@@ -6,9 +6,11 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
-#include <cstring> // Added for memset
+#include <cstring>
 #include <secp256k1.h>
 #include <iomanip>
+
+// g++ -std=c++17 -o keygen keygen.cpp -lsecp256k1 -pthread
 
 const int THREADS = 8;
 const uint64_t LOOP_PER_THREAD = 2'000'000;
@@ -29,46 +31,50 @@ std::string bytes_to_hex(const unsigned char* data, size_t len) {
 std::unordered_set<std::string> load_known_pubkeys(const std::string& filename) {
     std::unordered_set<std::string> pubkeys;
     std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "[!] Error: Could not open " << filename << "\n";
+        return pubkeys;
+    }
     std::string line;
     while (std::getline(file, line)) {
         if (!line.empty()) pubkeys.insert(line);
     }
+    file.close();
     return pubkeys;
 }
 
-// Generate random 256-bit number in range [1, n-1] for secp256k1
+// Compare two 32-byte arrays (returns -1 if a < b, 0 if a == b, 1 if a > b)
+int compare_32bytes(const unsigned char* a, const unsigned char* b) {
+    for (int i = 0; i < 32; ++i) {
+        if (a[i] < b[i]) return -1;
+        if (a[i] > b[i]) return 1;
+    }
+    return 0;
+}
+
+// Generate random 256-bit private key in range [min, max]
 void fill_random_scalar(unsigned char* scalar, std::mt19937_64& gen) {
-    // secp256k1 curve order (n)
-    const unsigned char curve_order[32] = {
+    // Define range bounds as 32-byte arrays
+    const unsigned char min[32] = {
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00
+    };
+    const unsigned char max[32] = {
+        0x7F, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
         0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE,
-        0xBA, 0xAE, 0xDC, 0xE6, 0xAF, 0x48, 0xA0, 0x3B,
-        0xBF, 0xD2, 0x5E, 0x8C, 0xD0, 0x36, 0x41, 0x41
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF
     };
 
     // Generate random 32-byte scalar
-    for (int i = 0; i < 32; ++i) {
-        scalar[i] = static_cast<unsigned char>(std::uniform_int_distribution<uint32_t>(0, 255)(gen));
-    }
-
-    // Ensure scalar is in range [1, n-1]
-    // Compare with curve order and adjust if necessary
-    bool is_zero = true;
-    bool too_large = false;
-    for (int i = 0; i < 32; ++i) {
-        if (scalar[i] > curve_order[i]) {
-            too_large = true;
-            break;
-        } else if (scalar[i] < curve_order[i]) {
-            is_zero = false;
-            break;
+    do {
+        for (int i = 0; i < 32; ++i) {
+            scalar[i] = static_cast<unsigned char>(std::uniform_int_distribution<uint32_t>(0, 255)(gen));
         }
-    }
-
-    // If scalar is zero or >= n, regenerate
-    if (is_zero || too_large) {
-        fill_random_scalar(scalar, gen); // Recursive call to regenerate
-    }
+        // Ensure scalar is in range [min, max]
+    } while (compare_32bytes(scalar, min) < 0 || compare_32bytes(scalar, max) > 0);
 }
 
 void worker(int tid, secp256k1_context* ctx) {
@@ -80,7 +86,7 @@ void worker(int tid, secp256k1_context* ctx) {
 
         secp256k1_pubkey pubkey;
         if (!secp256k1_ec_pubkey_create(ctx, &pubkey, priv)) {
-            continue; // invalid scalar, retry
+            continue; // Invalid scalar, retry
         }
 
         unsigned char compressed[33];
@@ -92,11 +98,16 @@ void worker(int tid, secp256k1_context* ctx) {
             std::lock_guard<std::mutex> lock(file_mutex);
             if (!found.exchange(true)) {
                 std::cout << "\n[✓] Match found on thread " << tid << "\n";
-                std::cout << "[+] Compressed: " << hex_comp << "\n";
+                std::cout << "[+] Compressed Pubkey: " << hex_comp << "\n";
+                std::cout << "[+] Private Key: 0x" << bytes_to_hex(priv, 32) << "\n";
 
                 std::ofstream f("found_keys.txt", std::ios::app);
-                f << "Match: " << hex_comp << "\nPrivateKey = 0x" << bytes_to_hex(priv, 32) << "\n";
-                f.close();
+                if (f.is_open()) {
+                    f << "Match: " << hex_comp << "\nPrivateKey = 0x" << bytes_to_hex(priv, 32) << "\n\n";
+                    f.close();
+                } else {
+                    std::cerr << "[!] Error: Could not open found_keys.txt for writing\n";
+                }
             }
             return;
         }
@@ -110,10 +121,19 @@ void worker(int tid, secp256k1_context* ctx) {
 int main() {
     std::cout << "[+] Loading known pubkeys from pubs.txt...\n";
     known_pubs = load_known_pubkeys("pubs.txt");
+    if (known_pubs.empty()) {
+        std::cerr << "[!] Warning: No public keys loaded from pubs.txt\n";
+    } else {
+        std::cout << "[+] Loaded " << known_pubs.size() << " public keys\n";
+    }
 
     std::cout << "[+] Starting " << THREADS << " threads...\n";
 
     secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
+    if (!ctx) {
+        std::cerr << "[!] Error: Failed to create secp256k1 context\n";
+        return 1;
+    }
 
     std::vector<std::thread> threads;
     for (int i = 0; i < THREADS; ++i) {
